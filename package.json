@@ -1,0 +1,29 @@
+{
+  "name": "@docuseal/signature-maker-js",
+  "version": "1.0.0",
+  "description": "JS library for drawing signatures",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "repository": "https://github.com/docusealco/signature-maker-js",
+  "keywords": [
+    "js-signature",
+    "signature",
+    "signature-drawing"
+  ],
+  "author": "Alex Turchyn <alex@docuseal.co>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/docusealco/signature-maker-js/issues"
+  },
+  "homepage": "https://github.com/docusealco/signature-maker-js#readme",
+  "dependencies": {
+    "signature_pad": "^5.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.1"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "node esbuild.config.js"
+  }
+}
