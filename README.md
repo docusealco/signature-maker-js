@@ -6,114 +6,65 @@
 
 # Signature Maker JS
 
-Signature Maker is a web component that lets users draw or type their signature.
+Web component that lets users draw, type or upload their signature and returns it as a PNG.
 
-#### Other implementations
-
-- [React](https://github.com/docusealco/signature-maker-react)
-- [Vue](https://github.com/docusealco/signature-maker-vue)
-
-## Demo
-
-Try the live demo [here](https://www.docuseal.com/online-signature)
-
-## Documentation
-
-Check out the full documentation [here](https://www.docuseal.com/docs/embedded/signature#js).
+[Live demo](https://www.docuseal.com/online-signature) · [Documentation](https://www.docuseal.com/docs/embedded/signature#js) · [React](https://github.com/docusealco/signature-maker-react) · [Vue](https://github.com/docusealco/signature-maker-vue)
 
 ## Installation
 
 ```bash
 npm install @docuseal/signature-maker-js
-```
-
-OR
-
-```bash
+# or
 yarn add @docuseal/signature-maker-js
 ```
 
-OR
+```js
+import '@docuseal/signature-maker-js'
+```
+
+Importing the package registers the `<signature-maker>` element. The import is safe in server-side rendered apps. Without a bundler, load it from a CDN:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@docuseal/signature-maker-js/dist/index.cjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@docuseal/signature-maker-js@1/dist/index.cjs.js"></script>
 ```
 
 ## Usage
 
-Basic Usage with standard styles and default signature saving behavior:
+No JavaScript needed: the Submit button downloads the signature as a PNG.
 
 ```html
-<signature-maker
-  id="signatureMaker"
-  data-download-on-save="true"
->
-</signature-maker>
+<signature-maker data-download-on-save="true"></signature-maker>
 ```
 
----
-
-Usage with default styles but custom signature saving behavior, such as uploading the signature to a server:
+Handle the signature when the user clicks Submit:
 
 ```html
-<signature-maker id="signatureMaker"><signature-maker>
+<signature-maker id="signatureMaker"></signature-maker>
 
 <script>
-  window.signatureMaker.addEventListener('save', (e) => {
+  signatureMaker.addEventListener('save', (e) => {
     fetch('/save-signature', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file: e.detail.base64 }),
-    });
+    })
   })
 </script>
 ```
 
----
-
-Usage without a save signature button, embedded in another form. The signature will be stored in a form field named `signature`:
+Embed in a form without the Submit button. A nested file input receives the PNG on every change:
 
 ```html
-<form id="myForm" method="POST" action="/submit-form">
+<form method="POST" action="/submit-form">
   <input name="name" type="text">
-  <signature-maker
-    id="signatureMaker"
-    data-with-submit="false"
-  >
-    <input type="hidden" type="file" name="signature">
+  <signature-maker data-with-submit="false">
+    <input type="file" name="signature">
   </signature-maker>
   <button type="submit">Submit</button>
 </form>
 ```
 
----
-
-Usage without a save signature button and tracking each signature change:
-
-```html
-<signature-maker
-  id="signatureMaker"
-  data-with-submit="false"
->
-</signature-maker>
-<script>
-  window.signatureMaker.addEventListener('change', (e) => {
-    if (e.detail.base64) {
-      fetch('/background-save-signature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: e.detail.base64 }),
-      });
-    } else {
-      console.log('No signature to save');
-    }
-  })
-</script>
-```
-
----
-
-Usage with custom button labels and classes (DaisyUI):
+Restyle with CSS classes and translate the labels. A full DaisyUI example:
 
 ```html
 <signature-maker
@@ -141,70 +92,47 @@ Usage with custom button labels and classes (DaisyUI):
 </signature-maker>
 ```
 
----
+## Events
 
-Usage with customization of certain elements using CSS classes and styles:
+| Event | When | `e.detail` |
+|---|---|---|
+| `save` | Submit button clicked | `{ base64, blob }` |
+| `change` | Signature drawn, typed, uploaded or cleared | `{ base64, blob }`, both `null` when empty |
 
-```html
-<signature-maker
-  data-save-button-class="btn btn-neutral text-white text-base w-full"
-  data-canvas-class="bg-white border border-base-300 rounded-2xl w-full"
-  data-canvas-style="border: 2px solid #000;"
->
-</signature-maker>
+The element also exposes `enableDrawPanel()`, `enableTextPanel()`, `enableUploadPanel()` and the underlying [signature_pad](https://github.com/szimek/signature_pad) instance as `pad`. TypeScript declarations are included; the payload type is `SignatureDetail`:
+
+```ts
+import type { SignatureDetail } from '@docuseal/signature-maker-js'
+
+el.addEventListener('save', (e: CustomEvent<SignatureDetail>) => console.log(e.detail.base64))
 ```
 
-## Customization
+## Attributes
 
-Signature Maker can be customized with the following attributes:
+Behavior:
 
-```
-data-download-on-save
-data-with-typed
-data-with-drawn
-data-with-upload
-data-with-color-select
-data-with-submit
-data-save-button-text
-data-control-buttons-container-class
-data-control-buttons-container-style
-data-save-button-class
-data-save-button-style
-data-save-button-disabled-class
-data-save-button-disabled-style
-data-undo-button-text
-data-undo-button-class
-data-undo-button-style
-data-clear-button-text
-data-clear-button-class
-data-clear-button-style
-data-text-input-placeholder
-data-text-input-class
-data-text-input-style
-data-canvas-class
-data-canvas-style
-data-type-buttons-container-class
-data-type-buttons-container-style
-data-draw-type-button-text
-data-draw-type-button-class
-data-draw-type-button-style
-data-draw-type-button-active-class
-data-draw-type-button-active-style
-data-text-type-button-text
-data-text-type-button-class
-data-text-type-button-style
-data-text-type-button-active-class
-data-text-type-button-active-style
-data-upload-type-button-text
-data-upload-type-button-class
-data-upload-type-button-style
-data-upload-type-button-active-class
-data-upload-type-button-active-style
-data-font-url
-````
+| Attribute | Default | Description |
+|---|---|---|
+| `data-with-drawn` | `true` | Show the Draw tab |
+| `data-with-typed` | `true` | Show the Type tab |
+| `data-with-upload` | `true` | Show the Upload tab |
+| `data-with-color-select` | `true` | Show the pen color picker |
+| `data-with-submit` | `true` | Show the Submit button |
+| `data-download-on-save` | `false` | Download the PNG on Submit |
+| `data-font-url` | Dancing Script | WOFF font used for typed signatures |
 
-The full documentation with detailed configuration and event descriptions can be found [here](https://www.docuseal.com/docs/embedded/signature#js).
+Labels: `data-save-button-text`, `data-undo-button-text`, `data-clear-button-text`, `data-draw-type-button-text`, `data-text-type-button-text`, `data-upload-type-button-text`, `data-text-input-placeholder`.
 
-# License
+Styles: every element below accepts `data-<element>-class` and `data-<element>-style`. A class replaces the default inline styles, a style overrides them. State variants are appended to the base class or style.
+
+| Element | State variants |
+|---|---|
+| `save-button` | `disabled-class`, `disabled-style` |
+| `draw-type-button`, `text-type-button`, `upload-type-button` | `active-class`, `active-style` |
+| `undo-button`, `clear-button`, `text-input`, `canvas`, `type-buttons-container`, `control-buttons-container` | |
+
+Example: `data-draw-type-button-class="tab"` plus `data-draw-type-button-active-class="tab-active"` renders `class="tab tab-active"` while Draw is selected.
+
+## License
 
 MIT

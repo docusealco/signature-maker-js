@@ -1,29 +1,43 @@
 {
   "name": "@docuseal/signature-maker-js",
-  "version": "1.0.1",
-  "description": "JS library for drawing signatures",
+  "version": "1.1.0",
+  "description": "JS library for drawing, typing and uploading signatures",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
+  "types": "index.d.ts",
+  "unpkg": "dist/index.cjs.js",
+  "jsdelivr": "dist/index.cjs.js",
   "repository": "https://github.com/docusealco/signature-maker-js",
   "keywords": [
     "js-signature",
     "signature",
-    "signature-drawing"
+    "signature-drawing",
+    "signature-pad",
+    "web-component"
   ],
-  "author": "Alex Turchyn <alex@docuseal.com>",
+  "author": "DocuSeal <support@docuseal.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/docusealco/signature-maker-js/issues"
   },
   "homepage": "https://github.com/docusealco/signature-maker-js#readme",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "signature_pad": "^5.0.3"
+    "signature_pad": "^5.1.4"
   },
   "devDependencies": {
-    "esbuild": "^0.23.1"
+    "@playwright/test": "^1.65.0",
+    "esbuild": "^0.28.2"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "index.d.ts"
+  ],
   "scripts": {
-    "build": "node esbuild.config.js"
+    "build": "node esbuild.config.js",
+    "test": "playwright test",
+    "prepublishOnly": "yarn build && yarn test"
   }
 }

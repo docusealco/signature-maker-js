@@ -1,9 +1,13 @@
 import SignaturePad from "signature_pad"
 
-class SignatureMarker extends HTMLElement {
+const BaseElement = typeof HTMLElement === 'undefined' ? class {} : HTMLElement
+
+let instanceCounter = 0
+
+class SignatureMaker extends BaseElement {
   static DEFAULT_STYLES = {
     controlButtonsContainer: 'display: flex; align-items: center; justify-content: space-between; text-align: center; margin: 1rem 0;',
-    saveButton: 'color: #ffffff; font-family: ui-sans-serif, system-ui, sans-serif font-size: 16px; font-weight: 600; line-height: 24px; padding: 0px 16px; text-transform: uppercase; background-color: #222222; cursor: pointer; align-items: center; border-radius: 8px; gap: 8px; display: inline-flex; flex-shrink: 0; flex-wrap: wrap; height: 48px; justify-content: center; outline-color: #222222; text-align: center; text-decoration-line: none; width: 100%; border: 1px solid #222222;',
+    saveButton: 'color: #ffffff; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 16px; font-weight: 600; line-height: 24px; padding: 0px 16px; text-transform: uppercase; background-color: #222222; cursor: pointer; align-items: center; border-radius: 8px; gap: 8px; display: inline-flex; flex-shrink: 0; flex-wrap: wrap; height: 48px; justify-content: center; outline-color: #222222; text-align: center; text-decoration-line: none; width: 100%; border: 1px solid #222222;',
     saveButtonDisabled: 'background-color: #D3D3D3; color: #808080; cursor: not-allowed; border: 0;',
     undoButton: 'color: #222222; background-color: transparent; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; line-height: 14px; padding: 0px 12px; text-transform: uppercase; appearance: button; cursor: pointer; align-items: center; border-radius: 8px; gap: 8px; display: inline-flex; flex-shrink: 0; flex-wrap: wrap; height: 32px; justify-content: center; outline-color: #222222; text-align: center; border: 1px solid #222222;',
     clearButton: 'color: #222222; background-color: transparent; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; line-height: 14px; padding: 0px 12px; text-transform: uppercase; appearance: button; cursor: pointer; align-items: center; border-radius: 8px; gap: 8px; display: inline-flex; flex-shrink: 0; flex-wrap: wrap; height: 32px; justify-content: center; outline-color: #222222; text-align: center; border: 1px solid #222222;',
@@ -31,6 +35,7 @@ class SignatureMarker extends HTMLElement {
   constructor() {
     super()
     this.isMounted = false
+    this.uid = ++instanceCounter
   }
 
   static observedAttributes = [
@@ -40,6 +45,7 @@ class SignatureMarker extends HTMLElement {
     'data-with-upload',
     'data-with-color-select',
     'data-with-submit',
+    'data-font-url',
     'data-control-buttons-container-class',
     'data-control-buttons-container-style',
     'data-save-button-text',
@@ -144,6 +150,7 @@ class SignatureMarker extends HTMLElement {
       'data-with-upload': this.setDisplayType,
       'data-with-color-select': this.setDisplayColorSelect,
       'data-with-submit': this.setDisplaySubmit,
+      'data-font-url': this.setFontUrl,
       'data-control-buttons-container-class': this.setControlButtonsContainerClassAndStyle,
       'data-control-buttons-container-style': this.setControlButtonsContainerClassAndStyle,
       'data-save-button-text': this.setSaveButtonText,
@@ -235,6 +242,13 @@ class SignatureMarker extends HTMLElement {
 
   setDisplaySubmit = () => {
     this.saveButton.parentNode.style.display = this.dataset.withSubmit === 'false' ? 'none' : 'inherit'
+  }
+
+  setFontUrl = () => {
+    this.isFontLoaded = false
+    this.fontPromise = null
+
+    if (this.isTextTypeSelected) this.loadFont()
   }
 
   setControlButtonsContainerClassAndStyle = () => {
@@ -361,7 +375,7 @@ class SignatureMarker extends HTMLElement {
 
   setTextTypeButtonClassAndStyle = () => {
     let buttonClass = this.dataset.textTypeButtonClass || ''
-    let buttonStyle = this.dataset.textTypeButtonStyle || buttonClass ? '' : this.defaultStyles.textTypeButton
+    let buttonStyle = this.dataset.textTypeButtonStyle || (buttonClass ? '' : this.defaultStyles.textTypeButton)
 
     if (this.isTextTypeSelected) {
       if (buttonClass && this.dataset.textTypeButtonActiveClass) {
@@ -387,7 +401,7 @@ class SignatureMarker extends HTMLElement {
 
   setUploadTypeButtonClassAndStyle = () => {
     let buttonClass = this.dataset.uploadTypeButtonClass || ''
-    let buttonStyle = this.dataset.uploadTypeButtonStyle || buttonClass ? '' : this.defaultStyles.uploadTypeButton
+    let buttonStyle = this.dataset.uploadTypeButtonStyle || (buttonClass ? '' : this.defaultStyles.uploadTypeButton)
 
     if (this.isUploadTypeSelected) {
       if (buttonClass && this.dataset.uploadTypeButtonActiveClass) {
@@ -418,14 +432,18 @@ class SignatureMarker extends HTMLElement {
   }
 
   connectedCallback() {
-    if (document.readyState !== "complete") {
-      document.addEventListener('DOMContentLoaded', () => this.init())
+    if (this.isMounted) return
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init(), { once: true })
     } else {
       this.init()
     }
   }
 
   init () {
+    if (this.isMounted || !this.isConnected) return
+
     this.style.display = 'block'
 
     this.childrenNode = document.createElement('div')
@@ -453,9 +471,9 @@ class SignatureMarker extends HTMLElement {
 
     this.scale = 2
     this.isFontLoaded = false
+    this.fontPromise = null
 
-    this.canvas.width = this.canvas.parentNode.parentNode.clientWidth
-    this.canvas.height = this.canvas.parentNode.parentNode.clientWidth / this.scale
+    this.resizeCanvas()
 
     if (this.dataset.withDrawn !== 'false') {
       this.enableDrawPanel()
@@ -521,6 +539,7 @@ class SignatureMarker extends HTMLElement {
         if (this.textInput.value !== '') {
           this.canvas.getContext('2d').fillStyle = e.target.value
           this.drawText()
+          this.handleDownloadState()
         }
 
         this.pad.penColor = e.target.value
@@ -559,12 +578,7 @@ class SignatureMarker extends HTMLElement {
     this.intersectionObserver = new IntersectionObserver(
       (entries, _observer) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            this.canvas.width = this.canvas.parentNode.clientWidth * this.scale
-            this.canvas.height = (this.canvas.parentNode.clientWidth * this.scale) / 3
-
-            this.canvas.getContext('2d').scale(this.scale, this.scale)
-
+          if (entry.isIntersecting && this.resizeCanvas()) {
             this.intersectionObserver?.disconnect()
           }
         })
@@ -579,11 +593,28 @@ class SignatureMarker extends HTMLElement {
         this.drawTypeButton.getElementsByTagName('span')[0].style.display = isMobile ? 'none' : 'inline-block'
         this.textTypeButton.getElementsByTagName('span')[0].style.display = isMobile ? 'none' : 'inline-block'
         this.uploadTypeButton.getElementsByTagName('span')[0].style.display = isMobile ? 'none' : 'inline-block'
+
+        if (this.pad.isEmpty() && this.textInput.value === '') this.resizeCanvas()
       }
     })
 
     this.resizeObserver.observe(this)
     this.intersectionObserver.observe(this.canvas)
+  }
+
+  resizeCanvas() {
+    const width = this.canvas.parentNode.clientWidth
+
+    if (width === 0) return false
+
+    if (this.canvas.width !== width * this.scale) {
+      this.canvas.width = width * this.scale
+      this.canvas.height = (width * this.scale) / 3
+      this.canvas.getContext('2d').setTransform(this.scale, 0, 0, this.scale, 0, 0)
+      this.pad.clear()
+    }
+
+    return true
   }
 
   enableDrawPanel() {
@@ -697,19 +728,13 @@ class SignatureMarker extends HTMLElement {
               targetHeight = canvasWidth / aspectRatio
             }
 
-            if (targetHeight > targetWidth) {
-              const scale = targetHeight / targetWidth
-              targetWidth = targetWidth * scale
-              targetHeight = targetHeight * scale
-            }
-
             const x = (canvasWidth - targetWidth) / 2
             const y = (canvasHeight - targetHeight) / 2
 
             setTimeout(() => {
               context.clearRect(0, 0, canvasWidth, canvasHeight)
               context.drawImage(img, x, y, targetWidth, targetHeight)
-              this.pad.fromDataURL('')
+              this.pad.fromDataURL('').catch(() => {})
               resolve()
             }, 50)
           }
@@ -745,12 +770,14 @@ class SignatureMarker extends HTMLElement {
   }
 
   handleDownloadState() {
+    const changeId = this.changeId = (this.changeId || 0) + 1
+
     if (this.pad.isEmpty() && this.textInput.value === '') {
       this.distributeSignatureData(null)
       this.disableSaveButton()
     } else {
       this.cropCanvas(this.canvas).then((blob) => {
-        this.distributeSignatureData(blob)
+        if (changeId === this.changeId) this.distributeSignatureData(blob)
       }).catch((error) => {
         console.error('Failed to create a PNG blob:', error)
       })
@@ -771,7 +798,7 @@ class SignatureMarker extends HTMLElement {
       })
 
       if (nestedFileInput) {
-        const file = new File([blob], `signature-${Date.now()}.png`, { type: blob.type, lastModified: new Date() })
+        const file = new File([blob], `signature-${Date.now()}.png`, { type: blob.type, lastModified: Date.now() })
         const container = new DataTransfer()
 
         container.items.add(file)
@@ -804,17 +831,25 @@ class SignatureMarker extends HTMLElement {
   }
 
   loadFont() {
-    if (!this.isFontLoaded) {
+    if (!this.fontPromise) {
       const fontUrl = this.dataset.fontUrl || 'https://cdn.jsdelivr.net/npm/@fontsource/dancing-script/files/dancing-script-latin-400-normal.woff'
       const font = new FontFace('SignatureFont', `url(${fontUrl})`)
 
-      font.load().then((loadedFont) => {
+      this.fontPromise = font.load().then((loadedFont) => {
         document.fonts.add(loadedFont)
         this.isFontLoaded = true
-      }).catch((error) => {
-        console.error('Font loading failed:', error)
       })
     }
+
+    this.fontPromise.then(() => {
+      if (this.isTextTypeSelected && this.textInput.value !== '') {
+        this.drawText()
+        this.handleDownloadState()
+      }
+    }).catch((error) => {
+      this.fontPromise = null
+      console.error('Font loading failed:', error)
+    })
   }
 
   downloadBlob(blob, filename) {
@@ -863,6 +898,13 @@ class SignatureMarker extends HTMLElement {
       }
     }
 
+    if (rightmost < leftmost) {
+      leftmost = 0
+      topmost = 0
+      rightmost = width - 1
+      bottommost = height - 1
+    }
+
     const croppedWidth = rightmost - leftmost + 1
     const croppedHeight = bottommost - topmost + 1
 
@@ -885,15 +927,15 @@ class SignatureMarker extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (!this.isMounted) return
+
+    this.resizeObserver?.disconnect()
+    this.intersectionObserver?.disconnect()
+    this.pad.off()
     this.fieldNode.remove()
-
-    if (this.resizeObserver) {
-      this.resizeObserver.unobserve(this)
-    }
-
-    if (this.intersectionObserver) {
-      this.intersectionObserver.unobserve(this.canvas)
-    }
+    this.append(...this.childrenNode.childNodes)
+    this.childrenNode.remove()
+    this.isMounted = false
   }
 
   get tempalte() {
@@ -910,7 +952,7 @@ class SignatureMarker extends HTMLElement {
                       <path d="M16 7h4"></path>
                     </svg>
                     <span>${this.defaultLabels.drawTypeButton}</span>
-                    <input type="radio" name="type_option" id="draw_radio" value="draw" style="display: none;">
+                    <input type="radio" name="type_option_${this.uid}" value="draw" style="display: none;">
                   </label>
                 </div>
                 <div>
@@ -925,22 +967,22 @@ class SignatureMarker extends HTMLElement {
                       <path d="M17 19h2"></path>
                     </svg>
                     <span>${this.defaultLabels.textTypeButton}</span>
-                    <input type="radio" name="type_option" id="text_radio" value="draw" style="display: none;">
+                    <input type="radio" name="type_option_${this.uid}" value="text" style="display: none;">
                   </label>
                 </div>
                 <div>
-                  <label data-target="uploadTypeButton" for="signature_file_upload">
+                  <label data-target="uploadTypeButton">
                     <svg xmlns="http://www.w3.org/2000/svg" style="width: 1.5rem; height: 1.5rem;" width="16" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2"></path>
                       <path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
                     </svg>
                     <span>${this.defaultLabels.uploadTypeButton}</span>
-                    <input data-target="fileInput" id="signature_file_upload" type="file" accept="image/*" style="display: none;">
-                    <input type="radio" name="type_option" id="upload_radio" value="upload" style="display: none;">
+                    <input data-target="fileInput" type="file" accept="image/*" style="display: none;">
+                    <input type="radio" name="type_option_${this.uid}" value="upload" style="display: none;">
                   </label>
                 </div>
               </div>
-            </div
+            </div>
             <div>
               <div>
                 <input placeholder="${this.defaultLabels.textInputPlaceholder}" data-target="textInput">
@@ -950,10 +992,10 @@ class SignatureMarker extends HTMLElement {
               </div>
               <div data-target="controlButtonsContainer">
                 <div data-target="colorSelect" style="display: flex; gap: 1rem;">
-                  <input aria-label="Black" type="radio" data-target="colorInput" name="color" value="#000000" style="accent-color: #000000; transform: scale(1.5);" checked>
-                  <input aria-label="Blue" type="radio" data-target="colorInput" name="color" value="#3B82F6" style="accent-color: #3B82F6; transform: scale(1.5);">
-                  <input aria-label="Green" type="radio" data-target="colorInput" name="color" value="#008000" style="accent-color: #008000; transform: scale(1.5);">
-                  <input aria-label="Red" type="radio" data-target="colorInput" name="color" value="#EF4444" style="accent-color: #EF4444; transform: scale(1.5);">
+                  <input aria-label="Black" type="radio" data-target="colorInput" name="color_${this.uid}" value="#000000" style="accent-color: #000000; transform: scale(1.5);" checked>
+                  <input aria-label="Blue" type="radio" data-target="colorInput" name="color_${this.uid}" value="#3B82F6" style="accent-color: #3B82F6; transform: scale(1.5);">
+                  <input aria-label="Green" type="radio" data-target="colorInput" name="color_${this.uid}" value="#008000" style="accent-color: #008000; transform: scale(1.5);">
+                  <input aria-label="Red" type="radio" data-target="colorInput" name="color_${this.uid}" value="#EF4444" style="accent-color: #EF4444; transform: scale(1.5);">
                 </div>
                 <div>
                   <span>
@@ -990,7 +1032,5 @@ class SignatureMarker extends HTMLElement {
 }
 
 if (typeof window !== 'undefined' && window.customElements && !window.customElements.get("signature-maker")) {
-  window.customElements.define("signature-maker", SignatureMarker);
-} else {
-  throw new Error('signature-maker-js can only be used in a browser environment.')
+  window.customElements.define("signature-maker", SignatureMaker)
 }
