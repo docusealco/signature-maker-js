@@ -183,6 +183,32 @@ test('multiple instances keep independent color and type groups', async ({ page 
 	expect(await page.evaluate(() => (document.querySelector('#sig2') as any).pad.penColor)).toBe('#EF4444')
 })
 
+test('native change events of inner inputs do not leak out of the element', async ({ page }) => {
+	await mount(page)
+
+	await page.evaluate(() => {
+		const w = window as any
+		w.nativeChanges = 0
+		document.querySelector('#sig')!.addEventListener('change', (e) => {
+			if (!(e instanceof CustomEvent)) w.nativeChanges++
+		})
+		document.addEventListener('change', (e) => {
+			if (!(e instanceof CustomEvent)) w.nativeChanges++
+		})
+	})
+
+	await page.locator('#sig [data-target="colorInput"][value="#EF4444"]').check()
+	await page.locator('#sig [data-target="textTypeButton"]').click()
+	await page.locator('#sig [data-target="textInput"]').fill('John')
+	await page.locator('#sig [data-target="textInput"]').blur()
+	await page.locator('#sig [data-target="uploadTypeButton"]').click()
+	await page.locator('#sig [data-target="fileInput"]').setInputFiles({ name: 'sig.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') })
+	await lastEvent(page, 'change')
+
+	expect(await page.evaluate(() => (window as any).nativeChanges)).toBe(0)
+	expect(await page.evaluate(() => (document.querySelector('#sig') as any).pad.penColor)).toBe('#EF4444')
+})
+
 test('survives being detached and re-attached', async ({ page }) => {
 	await mount(page)
 	await draw(page)

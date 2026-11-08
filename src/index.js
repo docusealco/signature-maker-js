@@ -460,6 +460,8 @@ class SignatureMaker extends BaseElement {
 
     this.appendChild(this.fieldNode)
 
+    this.fieldNode.addEventListener('change', (e) => e.stopPropagation())
+
     this.pad = new SignaturePad(this.canvas)
     this.isMounted = true
 
